@@ -27,7 +27,7 @@ export function getVanityNumbers(numberForWordSearch: string): Map<number, strin
     var phoneWords: phoneWord[] = []
     // Search each word in the dictionary to assess if it fits anywhere inside the number provided
     for (let word in wordDictionary) {
-        // This process could be sped up using worker_threads, allowing for a larger library
+        // This process could be sped up using worker_threads, allowing for a larger library to search through
         let fitPos: number = assessFit(word, numberForWordSearch)
 
         if (fitPos >= 0) {

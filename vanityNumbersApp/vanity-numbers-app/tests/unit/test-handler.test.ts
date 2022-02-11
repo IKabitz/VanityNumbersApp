@@ -1,7 +1,6 @@
 import {
     ConnectContactFlowEvent
 } from "aws-lambda";
-import { workerData } from "worker_threads";
 import { lambdaHandler } from "../../src-ts/app";
 import { assessFit, insertPhoneWords, phoneWord } from "../../src-ts/vanityNumbers";
 
