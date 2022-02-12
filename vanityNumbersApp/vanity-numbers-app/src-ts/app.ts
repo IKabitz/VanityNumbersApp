@@ -39,8 +39,6 @@ export const lambdaHandler = async (
     }
 
     // Choose the best five from the list
-    // TODO what if there are none returned? (all ones or zeros)
-    // Q out to John
     var returned: number = 0;
     var bestNumbers: string[] = [];
     for (let i=highest; i > 0 && returned < storeLimit; i--) {
@@ -55,6 +53,10 @@ export const lambdaHandler = async (
                 }
             }
          }
+    }
+
+    if (bestNumbers.length < returnLimit) {
+        throw new Error("Not enough numbers to return for given number " + numberForWordSearch);
     }
 
     console.log("Best Numbers: " + bestNumbers)
