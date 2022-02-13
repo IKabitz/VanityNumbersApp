@@ -4,6 +4,30 @@ This repository contains the serverless application which can be called from an 
 
 It identifies the 5 best valid vanity numbers for the connecting phone number, returns 3 of them to the contact flow to be repeated, and stores the top 5 within dynamo db.
 
+**Deployment Instructions**
+Assuming AWS SAM cli is set up, clone or download the repository, then execute the following commands.
+
+> cd vanityNumbersApp
+> npm install
+> npm run compile
+> cd ..
+> sam deploy --guided
+
+Follow the on screen instructions. This will deploy the serverless application that encompasses the lambda and the DynamoDB table.
+
+**Importing and configuring the contact flow**
+After you have deployed the SAM application, navigate to your AWS connect instance.
+
+ - Navigate to 'Contact flows' and find the AWS Lambda section of the page.
+ - Use the page form to add the lambda to your connect instance.
+ - Navigate to your connect instance and login.
+ - Navigate to the Contact Flows menu, and create a new contact flow.
+ - Navigate to the dropdown (carat) menu at the top right of the screen, and select the 'Import Flow' option.
+ - Use the form to import the Contact Flow and save it.
+From here, you will need to find the 'Invoke AWS Lambda function' Flow card, and you will need to select the function ARN for the lambda function from the list.
+
+At this point, all you have to do is attach the flow to one of your phone numbers in the Manage Phone numbers menu, and you are ready to go!
+
   ## Overview: The components
 
 1. The Serverless Application Model deployment
