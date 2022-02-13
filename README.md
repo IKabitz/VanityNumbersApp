@@ -7,10 +7,10 @@ It identifies the 5 best valid vanity numbers for the connecting phone number, r
 **Deployment Instructions**
 Assuming AWS SAM cli is set up, clone or download the repository, then execute the following commands.
 
-> cd vanityNumbersApp
-> npm install
-> npm run compile
-> cd ..
+> cd vanityNumbersApp,
+> npm install,
+> npm run compile,
+> cd .. ,
 > sam deploy --guided
 
 Follow the on screen instructions. This will deploy the serverless application that encompasses the lambda and the DynamoDB table.
