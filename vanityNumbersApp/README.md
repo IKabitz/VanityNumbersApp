@@ -1,127 +1,104 @@
-# vanityNumbersApp
+# Vanity Numbers Application
 
-This project contains source code and supporting files for a serverless application that you can deploy with the SAM CLI. It includes the following files and folders.
+This repository contains the serverless application which can be called from an AWS Connect Contact flow.
 
-- hello-world - Code for the application's Lambda function.
-- events - Invocation events that you can use to invoke the function.
-- hello-world/tests - Unit tests for the application code. 
-- template.yaml - A template that defines the application's AWS resources.
+It identifies the 5 best valid vanity numbers for the connecting phone number, returns 3 of them to the contact flow to be repeated, and stores the top 5 within dynamo db.
 
-The application uses several AWS resources, including Lambda functions and an API Gateway API. These resources are defined in the `template.yaml` file in this project. You can update the template to add AWS resources through the same deployment process that updates your application code.
+  ## Overview: The components
 
-If you prefer to use an integrated development environment (IDE) to build and test your application, you can use the AWS Toolkit.  
-The AWS Toolkit is an open source plug-in for popular IDEs that uses the SAM CLI to build and deploy serverless applications on AWS. The AWS Toolkit also adds a simplified step-through debugging experience for Lambda function code. See the following links to get started.
+1. The Serverless Application Model deployment
+2. The Lambda
+3. The AWS Connect Contact Flow
+4. The react UI site
+5. Improvements
+6. What Issues were faced in this implementation?
+8. What did I learn? (Typescript, AWS SAM, AWS CDK)
 
-* [CLion](https://docs.aws.amazon.com/toolkit-for-jetbrains/latest/userguide/welcome.html)
-* [GoLand](https://docs.aws.amazon.com/toolkit-for-jetbrains/latest/userguide/welcome.html)
-* [IntelliJ](https://docs.aws.amazon.com/toolkit-for-jetbrains/latest/userguide/welcome.html)
-* [WebStorm](https://docs.aws.amazon.com/toolkit-for-jetbrains/latest/userguide/welcome.html)
-* [Rider](https://docs.aws.amazon.com/toolkit-for-jetbrains/latest/userguide/welcome.html)
-* [PhpStorm](https://docs.aws.amazon.com/toolkit-for-jetbrains/latest/userguide/welcome.html)
-* [PyCharm](https://docs.aws.amazon.com/toolkit-for-jetbrains/latest/userguide/welcome.html)
-* [RubyMine](https://docs.aws.amazon.com/toolkit-for-jetbrains/latest/userguide/welcome.html)
-* [DataGrip](https://docs.aws.amazon.com/toolkit-for-jetbrains/latest/userguide/welcome.html)
-* [VS Code](https://docs.aws.amazon.com/toolkit-for-vscode/latest/userguide/welcome.html)
-* [Visual Studio](https://docs.aws.amazon.com/toolkit-for-visual-studio/latest/user-guide/welcome.html)
+  
 
-## Deploy the sample application
+### The Serverless Application Model deployment
+The deployment of the Vanity Numbers Lambda and the Vanity Numbers Dynamo DB table is automated through AWS SAM cli. This packages the lambda source code and bundles it with the resources provisioned in the CloudFormation template, template.yaml.
 
-The Serverless Application Model Command Line Interface (SAM CLI) is an extension of the AWS CLI that adds functionality for building and testing Lambda applications. It uses Docker to run your functions in an Amazon Linux environment that matches Lambda. It can also emulate your application's build environment and API.
+The lambda, which is written in TypeScript to ensure type safety, is built and compiled into a regular JavaScript file when `npm compile` is executed. Then, the resources are deployed using the current state of the source code when `sam deploy`is executed.
 
-To use the SAM CLI, you need the following tools.
+I chose to use AWS SAM for this application deployment because I believe that it would provide a simple way to deploy the serverless application with minimal configuration.
 
-* SAM CLI - [Install the SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-install.html)
-* Node.js - [Install Node.js 10](https://nodejs.org/en/), including the NPM package management tool.
-* Docker - [Install Docker community edition](https://hub.docker.com/search/?type=edition&offering=community)
 
-To build and deploy your application for the first time, run the following in your shell:
+### The Vanity Numbers Lambda
+The lambda is configured to accept a ConnectContactFlowEvent object, from which it extracts the connecting number from the customer endpoint information in the request.
 
-```bash
-sam build
-sam deploy --guided
-```
+The lambda then utilizes a modified (incomplete) English dictionary object in JavaScript (all credit to dwyl: https://github.com/dwyl/english-words) to scan the dictionary, assessing the fit of each individual word into the phone number, according to the E.161 specification for phone number and letter group mappings (see reference https://en.wikipedia.org/wiki/E.161). Each word that has a valid fit has a phoneWord object created to represent the word and where exactly it fits inside of the phone number (at the earliest point in the phone number that it could fit).
 
-The first command will build the source of your application. The second command will package and deploy your application to AWS, with a series of prompts:
+The application then assesses all possible combinations of the phone words to find the vanity numbers with the highest number of letters inserted (thus making the criteria of the "best" numbers, the set of numbers with the highest amount of letters within them).
 
-* **Stack Name**: The name of the stack to deploy to CloudFormation. This should be unique to your account and region, and a good starting point would be something matching your project name.
-* **AWS Region**: The AWS region you want to deploy your app to.
-* **Confirm changes before deploy**: If set to yes, any change sets will be shown to you before execution for manual review. If set to no, the AWS SAM CLI will automatically deploy application changes.
-* **Allow SAM CLI IAM role creation**: Many AWS SAM templates, including this example, create AWS IAM roles required for the AWS Lambda function(s) included to access AWS services. By default, these are scoped down to minimum required permissions. To deploy an AWS CloudFormation stack which creates or modifies IAM roles, the `CAPABILITY_IAM` value for `capabilities` must be provided. If permission isn't provided through this prompt, to deploy this example you must explicitly pass `--capabilities CAPABILITY_IAM` to the `sam deploy` command.
-* **Save arguments to samconfig.toml**: If set to yes, your choices will be saved to a configuration file inside the project, so that in the future you can just re-run `sam deploy` without parameters to deploy changes to your application.
+The numbers are returned as a comma separated list of strings, where the vanity words are outlined with dashes. For example:
+"*+11234567890*" may translate to "*11-ceil-6-qty-0*". 
+Hmm, maybe a clever name for a company that sells ceilings called "*ceiling team 6*"? (Like Seal team 6?) Just a thought...
 
-You can find your API Gateway Endpoint URL in the output values displayed after deployment.
+#### The dictionary and it's modifications
+In order to keep the runtime of the lambda under 8 seconds (the maximum amount of time that the AWS Connect Contact Flow will wait for the lambda to return), the dictionary had to be paired down heavily. All words 6 letters or longer were discarded to get the search space down to approximately 25,000 words.
+**In a production setting:** We could use a multi-threading tool like worker_threads to concurrently execute the task, cutting down the run time and allowing for a larger library.
 
-## Use the SAM CLI to build and test locally
+### The AWS Connect contact flow
+Included in the submission, a contact flow was created to ensure a customer was calling from a phone number, and then plays a short prompt:
 
-Build your application with the `sam build` command.
+> Hello! Thank you for calling the Vanity Number project. Shortly, we will return to you a list of 3 best vanity phone number options for your connecting number.
 
-```bash
-vanityNumbersApp$ sam build
-```
+Afterwards, the lambda is triggered, and the final prompts are played.
 
-The SAM CLI installs dependencies defined in `hello-world/package.json`, creates a deployment package, and saves it in the `.aws-sam/build` folder.
+> Your best vanity numbers are $.External.phoneNumbers
 
-Test a single function by invoking it directly with a test event. An event is a JSON document that represents the input that the function receives from the event source. Test events are included in the `events` folder in this project.
+Where *$.External.phoneNumbers* is the value of the valid phone numbers returned from the lambda as described above.
 
-Run functions locally and invoke them with the `sam local invoke` command.
 
-```bash
-vanityNumbersApp$ sam local invoke HelloWorldFunction --event events/event.json
-```
+### The Static React UI
+The static react site allows us to view the last 5 participants, the phone numbers that they called with, and the top five vanity numbers that apply to their connecting phone numbers. You can find the repository for the UI here: https://github.com/IKabitz/VanityNumbersUI
+There is a readme in that repo that explains how the UI project is constructed and hosted.
 
-The SAM CLI can also emulate your application's API. Use the `sam local start-api` to run the API locally on port 3000.
+### Potential Improvements
+Obviously, this is a tenuous and quick implementation. A culmination of a few hours of effort here and there. Given more time, there are a few improvements that I believe could be made:
 
-```bash
-vanityNumbersApp$ sam local start-api
-vanityNumbersApp$ curl http://localhost:3000/
-```
+ 1. More robust error handling, both in the lambda and the contact flow.
+ 2. A fleshed out suite of unit tests that more thoroughly describe user stories or use cases.
+ 3. Efficiency improvements for the word search process, both in terms of dictionary storage and concurrent processing. For example, the worker_threads library can be used to dispatch a thread for every one thousand words, potentially cutting the search time down greatly and allowing for a larger set of words to be used (for up to 10 letter words).
 
-The SAM CLI reads the application template to determine the API's routes and the functions that they invoke. The `Events` property on each function's definition includes the route and method for each path.
 
-```yaml
-      Events:
-        HelloWorld:
-          Type: Api
-          Properties:
-            Path: /hello
-            Method: get
-```
+### Big issues
+Right off of the bat, the biggest issue we have to contend with here falls into a classic kind of resource and efficiency problem: How do I maximize the search space of the word search, without making the implementation inefficient?
 
-## Add a resource to your application
-The application template uses AWS Serverless Application Model (AWS SAM) to define application resources. AWS SAM is an extension of AWS CloudFormation with a simpler syntax for configuring common serverless application resources such as functions, triggers, and APIs. For resources not included in [the SAM specification](https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md), you can use standard [AWS CloudFormation](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-template-resource-type-ref.html) resource types.
+Originally, I started off looking for existing solutions to this problem. That lead me to a great example at https://phonespell.org/. Essentially, they perform the process in the same way, and they graciously highlight that process here!
 
-## Fetch, tail, and filter Lambda function logs
+> To find all the interesting mnemonics for a given 7 digit phone number:
+> 
+> -   A database of words, indexed by number, is consulted, and each word in the database which matches the sequence (from the beginning)
+> and contains no extra digits/letters is selected. The database and
+> search engine are specially optimized to make this search fast and
+> efficient.
+> -   The first digit of the sequence is removed and the above search is repeated on the new sequence. This repeats until all there are no more
+> digits.
+> -   Additionally, words of 4 or more letters which match the end of the number but have a single extra letter are also found.
+> -   The result of the searches is a list of words to use to make the mnemonic. The words are put together in all possible combinations to
+> generate an exhaustive list of mnemonics. That list is put through a
+> proprietary filter which throws out mnemonics that are unteresting
+> (based on the feedback PhoneSpell has received over the years).
+> -   Finally, the mnemonics that pass through the filter are then sorted, formatted, and displayed.
 
-To simplify troubleshooting, SAM CLI has a command called `sam logs`. `sam logs` lets you fetch logs generated by your deployed Lambda function from the command line. In addition to printing the logs on the terminal, this command has several nifty features to help you quickly find the bug.
 
-`NOTE`: This command works for all AWS Lambda functions; not just the ones you deploy using SAM.
+They have a few extra steps involved, which I am assuming they aren't giving away freely as that would spoil the "secret sauce" that makes up the trade secrets of the site, I am sure...
 
-```bash
-vanityNumbersApp$ sam logs -n HelloWorldFunction --stack-name vanityNumbersApp --tail
-```
 
-You can find more information and examples about filtering Lambda function logs in the [SAM CLI Documentation](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-logging.html).
+#### Infrastructure: Deployability, localized testing, and ease of use.
+Using the SAM cli tool provided by AWS, I was able to write the lambda in TypeScript, test it locally, and deploy it easily with minimal configuration. I also used AWS CDK to deploy the React UI for the website. 
+Because I could utilize my own machine for development, I could also run the tests without affecting the existing AWS resources, making superfluous database entries, or messing up the existing lambda cloudwatch logs with test data and errors.
 
-## Unit tests
 
-Tests are defined in the `hello-world/tests` folder in this project. Use NPM to install the [Mocha test framework](https://mochajs.org/) and run unit tests.
+### What did I learn?
+Coming into this project, I had previously had:
+1. Some front end experience using React to build small web applications and tools for my team.
+2. No exposure to TypeScript.
+3. No exposure to AWS CDK or AWS SAM.
+4. No exposure to AWS Connect.
 
-```bash
-vanityNumbersApp$ cd hello-world
-hello-world$ npm install
-hello-world$ npm run test
-```
+With tools like SAM and CDK, it is easy to define, deploy, and update serverless applications, and the implications of these tools on project structure are huge. Looking back at previous projects, I can't believe I wasted time creating and deploying the same kind of applications just by using the tools available in the AWS console!
 
-## Cleanup
-
-To delete the sample application that you created, use the AWS CLI. Assuming you used your project name for the stack name, you can run the following:
-
-```bash
-aws cloudformation delete-stack --stack-name vanityNumbersApp
-```
-
-## Resources
-
-See the [AWS SAM developer guide](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/what-is-sam.html) for an introduction to SAM specification, the SAM CLI, and serverless application concepts.
-
-Next, you can use AWS Serverless Application Repository to deploy ready to use Apps that go beyond hello world samples and learn how authors developed their applications: [AWS Serverless Application Repository main page](https://aws.amazon.com/serverless/serverlessrepo/)
+Working with AWS Connect, creating contact flows and managing integration with all sorts of services is easy to learn quickly, and complicated to master. I look forward to working on more AWS Connect implementations in the future.
