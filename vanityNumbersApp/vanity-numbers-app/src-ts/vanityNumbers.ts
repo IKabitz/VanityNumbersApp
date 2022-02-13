@@ -142,7 +142,7 @@ export function assessFit(word: string, numberForWordSearch: string): number {
     var fitPos: number = -1;
     var currPos: number = 0;
 
-    while (currPos + word.length <= numberForWordSearch.length && fitPos < 1) {
+    while (currPos + word.length <= numberForWordSearch.length && fitPos < 0) {
         if (numberForWordSearch[currPos] === '1' || numberForWordSearch[currPos] === '0') {
             currPos += 1;
             continue;
